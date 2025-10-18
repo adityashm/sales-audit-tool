@@ -41,18 +41,7 @@ Double-click `run_app.bat` to start the application automatically!
 
 The app includes secure password-based authentication.
 
-**Default Credentials (Development Only):**
-- Username: `admin` | Password: `admin123`
-- Username: `auditor` | Password: `audit@2025`
-- Username: `manager` | Password: `manager123`
 
-⚠️ **IMPORTANT:** Change these passwords before deploying to production!
-
-See **[AUTHENTICATION_GUIDE.md](AUTHENTICATION_GUIDE.md)** for:
-- How to configure users
-- Password best practices
-- Security guidelines
-- Role-based access (coming soon)
 
 ## Usage 📝
 
