@@ -387,11 +387,18 @@ def _read_uploaded_file(name: str, file_bytes: bytes) -> pd.DataFrame:
         return pd.read_csv(io.BytesIO(file_bytes))
     return pd.read_excel(io.BytesIO(file_bytes))
 
-def analyze_data_quality(df):
-    """Analyze data quality and return issues with row locations."""
+def analyze_data_quality(df, critical_columns=None):
+    """Analyze data quality and return issues with row locations.
+    
+    Args:
+        df: DataFrame to analyze
+        critical_columns: List of column names that are critical for analysis
+    """
     issues = {
         'missing': {},
         'missing_details': {},  # Store specific row numbers
+        'critical_missing': {},  # Missing values in critical columns
+        'other_missing': {},  # Missing values in non-critical columns
         'duplicates': 0,
         'duplicate_rows': [],
         'non_numeric_prices': 0,
@@ -410,8 +417,15 @@ def analyze_data_quality(df):
             issues['missing_details'][col] = {
                 'count': missing_count,
                 'rows': missing_rows[:100],  # Limit to first 100 rows
-                'sample_preview': len(missing_rows) > 100
+                'sample_preview': len(missing_rows) > 100,
+                'is_critical': col in critical_columns if critical_columns else False
             }
+            
+            # Categorize as critical or other
+            if critical_columns and col in critical_columns:
+                issues['critical_missing'][col] = missing_count
+            else:
+                issues['other_missing'][col] = missing_count
     
     # Check duplicates with row locations
     duplicate_mask = df.duplicated(keep=False)
@@ -490,63 +504,7 @@ def main():
             st.sidebar.success(f"✅ File loaded: {uploaded_file.name}")
             st.sidebar.info(f"📝 Total records: {len(df)}")
             
-            # Data Health Check
-            st.sidebar.markdown("---")
-            with st.sidebar.expander("🏥 Data Health Check", expanded=False):
-                quality_issues = analyze_data_quality(df)
-                
-                # Missing values
-                if quality_issues['missing']:
-                    st.warning(f"⚠️ Missing values found in {len(quality_issues['missing'])} columns")
-                    
-                    # Show top 5 columns with missing values
-                    sorted_missing = sorted(quality_issues['missing_details'].items(), 
-                                          key=lambda x: x[1]['count'], reverse=True)
-                    
-                    for col, details in sorted_missing[:5]:
-                        with st.expander(f"📊 {col}: {details['count']} missing", expanded=False):
-                            # Convert row indices to Excel row numbers (add 2 for header)
-                            excel_rows = [idx + 2 for idx in details['rows'][:20]]
-                            
-                            st.markdown(f"**Missing in Excel rows:**")
-                            # Display in groups of 10 for readability
-                            row_groups = [excel_rows[i:i+10] for i in range(0, len(excel_rows), 10)]
-                            for group in row_groups:
-                                st.code(", ".join(map(str, group)))
-                            
-                            if details['sample_preview']:
-                                st.info(f"📌 Showing first 20 of {details['count']} missing rows")
-                            
-                            # Quick fix suggestions
-                            st.markdown("**💡 Quick Fixes:**")
-                            st.markdown(f"- Filter: `df[df['{col}'].notna()]`")
-                            st.markdown(f"- Fill: `df['{col}'].fillna('N/A')`")
-                    
-                    if len(quality_issues['missing']) > 5:
-                        st.markdown(f"... and **{len(quality_issues['missing']) - 5} more columns** with issues")
-                else:
-                    st.success("✅ No missing values")
-                
-                # Duplicates
-                if quality_issues['duplicates'] > 0:
-                    with st.expander(f"⚠️ {quality_issues['duplicates']} duplicate rows found", expanded=False):
-                        excel_rows = [idx + 2 for idx in quality_issues['duplicate_rows'][:20]]
-                        st.markdown("**Duplicate rows (Excel row numbers):**")
-                        row_groups = [excel_rows[i:i+10] for i in range(0, len(excel_rows), 10)]
-                        for group in row_groups:
-                            st.code(", ".join(map(str, group)))
-                        
-                        if len(quality_issues['duplicate_rows']) > 20:
-                            st.info(f"📌 Showing first 20 of {quality_issues['duplicates']} duplicates")
-                        
-                        st.markdown("**💡 Quick Fix:**")
-                        st.code("df.drop_duplicates(inplace=True)")
-                else:
-                    st.success("✅ No duplicate rows")
-                
-                st.info("💡 Detailed quality report included in Excel download")
-            
-            # Column mapping section
+            # Column mapping section (moved before Data Health Check)
             st.sidebar.markdown("---")
             st.sidebar.subheader("📋 Column Mapping")
             
@@ -606,6 +564,85 @@ def main():
                     help="Select the column containing prices/rates"
                 )
             }
+            
+            # Get critical column names from mapping
+            critical_columns = [
+                column_mapping['material_description'],
+                column_mapping['date_column'],
+                column_mapping['material_code'],
+                column_mapping['customer_name'],
+                column_mapping['basic_rate']
+            ]
+            
+            # Data Health Check (now with critical columns)
+            st.sidebar.markdown("---")
+            with st.sidebar.expander("🏥 Data Health Check", expanded=False):
+                quality_issues = analyze_data_quality(df, critical_columns=critical_columns)
+                
+                # Critical columns missing values
+                if quality_issues.get('critical_missing'):
+                    st.error(f"🚨 **CRITICAL:** Missing values in {len(quality_issues['critical_missing'])} analysis columns")
+                    
+                    for col, count in quality_issues['critical_missing'].items():
+                        details = quality_issues['missing_details'][col]
+                        with st.expander(f"🔴 {col}: {count} missing", expanded=True):
+                            # Convert row indices to Excel row numbers (add 2 for header)
+                            excel_rows = [idx + 2 for idx in details['rows'][:20]]
+                            
+                            st.markdown(f"**⚠️ This column is required for analysis!**")
+                            st.markdown(f"**Missing in Excel rows:**")
+                            # Display in groups of 10 for readability
+                            row_groups = [excel_rows[i:i+10] for i in range(0, len(excel_rows), 10)]
+                            for group in row_groups:
+                                st.code(", ".join(map(str, group)))
+                            
+                            if details['sample_preview']:
+                                st.info(f"📌 Showing first 20 of {count} missing rows")
+                            
+                            # Quick fix suggestions
+                            st.markdown("**💡 Quick Fixes:**")
+                            st.markdown(f"- Filter: `df[df['{col}'].notna()]`")
+                            st.markdown(f"- Fill: `df['{col}'].fillna('N/A')`")
+                            st.warning("⚠️ Rows with missing values in this column will be excluded from analysis")
+                
+                # Other missing values
+                if quality_issues.get('other_missing'):
+                    with st.expander(f"ℹ️ Missing values in {len(quality_issues['other_missing'])} other columns", expanded=False):
+                        st.info("These columns are not used in analysis but may be important for your records.")
+                        
+                        # Show top 5 other columns
+                        sorted_other = sorted(quality_issues['other_missing'].items(), 
+                                            key=lambda x: x[1], reverse=True)
+                        
+                        for col, count in sorted_other[:5]:
+                            details = quality_issues['missing_details'][col]
+                            st.markdown(f"- **{col}**: {count} missing")
+                        
+                        if len(quality_issues['other_missing']) > 5:
+                            st.markdown(f"... and **{len(quality_issues['other_missing']) - 5} more columns**")
+                
+                # Success message if no critical issues
+                if not quality_issues.get('critical_missing'):
+                    st.success("✅ All critical analysis columns are complete!")
+                
+                # Duplicates
+                if quality_issues['duplicates'] > 0:
+                    with st.expander(f"⚠️ {quality_issues['duplicates']} duplicate rows found", expanded=False):
+                        excel_rows = [idx + 2 for idx in quality_issues['duplicate_rows'][:20]]
+                        st.markdown("**Duplicate rows (Excel row numbers):**")
+                        row_groups = [excel_rows[i:i+10] for i in range(0, len(excel_rows), 10)]
+                        for group in row_groups:
+                            st.code(", ".join(map(str, group)))
+                        
+                        if len(quality_issues['duplicate_rows']) > 20:
+                            st.info(f"📌 Showing first 20 of {quality_issues['duplicates']} duplicates")
+                        
+                        st.markdown("**💡 Quick Fix:**")
+                        st.code("df.drop_duplicates(inplace=True)")
+                else:
+                    st.success("✅ No duplicate rows")
+                
+                st.info("💡 Detailed quality report included in Excel download")
             
             # Save current mapping
             save_mapping_to_session(column_mapping)
@@ -721,12 +758,12 @@ def main():
                         # Store ORIGINAL unfiltered results in session state
                         st.session_state.variance_df = variance_df
                         st.session_state.df_clean = df_clean
-                        st.session_state.quality_issues = analyze_data_quality(df)
+                        st.session_state.quality_issues = analyze_data_quality(df, critical_columns=critical_columns)
                         st.success("✅ Analysis complete!")
                     else:
                         st.session_state.variance_df = None
                         st.session_state.df_clean = df_clean
-                        st.session_state.quality_issues = analyze_data_quality(df)
+                        st.session_state.quality_issues = analyze_data_quality(df, critical_columns=critical_columns)
                 
                 # Display results (works on first run AND all subsequent reruns with filters)
                 if 'variance_df' in st.session_state and st.session_state.variance_df is not None:
