@@ -14,14 +14,14 @@
    ```
 3. Run:
    ```
-   python -m streamlit run app.py
+   python -m streamlit run src/app.py
    ```
 
 ### Option 3: Using VS Code
 1. Open terminal in VS Code (Ctrl + `)
 2. Run:
    ```
-   python -m streamlit run app.py
+   python -m streamlit run src/app.py
    ```
 
 ---
@@ -251,13 +251,16 @@ Once you're comfortable with the tool locally:
 
 ```
 project/
-├── app.py                  # Main Streamlit application
-├── sales.py                # Original analysis script
+├── src/
+│   ├── app.py              # Main Streamlit application
+│   └── sales.py            # Original analysis script
+├── data/
+│   └── sample_data.csv     # Example data for testing
 ├── requirements.txt        # Python dependencies
-├── sample_data.csv         # Example data for testing
-├── run_app.bat            # Windows launcher
-├── README.md              # Project overview
-├── DEPLOYMENT_GUIDE.md    # Hosting instructions
+├── run_app.bat             # Windows launcher
+├── docs/
+│   ├── README.md           # Project overview
+│   └── DEPLOYMENT_GUIDE.md # Hosting instructions
 ├── QUICKSTART.md          # This file
 ├── .gitignore             # Git ignore rules
 └── .streamlit/

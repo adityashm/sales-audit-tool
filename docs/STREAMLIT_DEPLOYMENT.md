@@ -58,7 +58,7 @@ Your repository should be at: `https://github.com/YOUR_USERNAME/sales-audit-tool
    |-------|-------|---------|
    | **Repository** | Your GitHub repo | `YOUR_USERNAME/sales-audit-tool` |
    | **Branch** | `main` | `main` |
-   | **Main file path** | `app.py` | `app.py` |
+   | **Main file path** | `src/app.py` | `src/app.py` |
    | **App URL** (optional) | Custom subdomain | `my-sales-audit` |
 
 3. **Advanced settings (optional):**
@@ -238,7 +238,7 @@ company_name = st.secrets["settings"]["company_name"]
 
 ### Multiple Users/Roles
 
-Update `app.py` to add more users:
+Update `src/app.py` to add more users:
 
 ```python
 # In Streamlit Cloud Secrets:
@@ -277,7 +277,7 @@ password = "db_password"
 
 2. **Add Google Analytics (Optional):**
 
-In `app.py`, add to the `<head>`:
+In `src/app.py`, add to the `<head>`:
 ```python
 st.markdown("""
     <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
@@ -298,14 +298,14 @@ st.markdown("""
 
 **Check build logs for errors:**
 - Missing dependencies in requirements.txt
-- Syntax errors in app.py
+- Syntax errors in src/app.py
 - Incompatible package versions
 
 **Solution:**
 ```powershell
 # Test locally first
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run src/app.py
 
 # If works locally, push to GitHub
 git push
@@ -541,7 +541,7 @@ Questions? Check the documentation or contact admin.
 1. **Monitor usage** for first week
 2. **Gather feedback** from users
 3. **Make improvements** based on feedback
-4. **Add features** as needed (see app.py for ideas)
+4. **Add features** as needed (see src/app.py for ideas)
 5. **Scale up** if needed (upgrade plan)
 
 ---

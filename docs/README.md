@@ -26,7 +26,7 @@ pip install -r requirements.txt
 
 3. Run the application:
 ```bash
-python -m streamlit run app.py
+python -m streamlit run src/app.py
 ```
 
 4. Open your browser and navigate to:
@@ -36,6 +36,7 @@ http://localhost:8501
 
 ### Quick Start (Windows)
 Double-click `run_app.bat` to start the application automatically!
+If deploying to Streamlit Cloud, set the Main file path to `src/app.py`.
 
 ## Authentication 🔐
 
@@ -159,7 +160,7 @@ COPY . .
 
 EXPOSE 8501
 
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "src/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
 ```
 
 2. Build and deploy:
@@ -234,28 +235,31 @@ For detailed troubleshooting, see **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)**
 
 4. **App Won't Start**:
    - Install all dependencies: `pip install -r requirements.txt`
-   - Try: `python -m streamlit run app.py`
+   - Try: `python -m streamlit run src/app.py`
 
 ## Project Structure 📁
 
 ```
 sales-audit-tool/
-├── app.py                          # Main application (with authentication)
-├── sales.py                        # Original script
+├── src/
+│   ├── app.py                      # Main Streamlit application (with authentication)
+│   └── sales.py                    # Original script/logic
+├── data/
+│   └── sample_data.csv             # Example data
 ├── requirements.txt                # Python dependencies
-├── sample_data.csv                 # Example data
 ├── run_app.bat                     # Windows launcher
-├── README.md                       # This file
-├── QUICKSTART.md                   # Quick start guide
-├── AUTHENTICATION_GUIDE.md         # Security guide
-├── GITHUB_SETUP.md                 # GitHub setup
-├── STREAMLIT_DEPLOYMENT.md         # Streamlit Cloud deployment
-├── DEPLOYMENT_GUIDE.md             # All deployment options
-├── TROUBLESHOOTING.md              # Problem solving
+├── docs/
+│   ├── README.md                   # This file
+│   ├── QUICKSTART.md               # Quick start guide
+│   ├── AUTHENTICATION_GUIDE.md     # Security guide
+│   ├── GITHUB_SETUP.md             # GitHub setup
+│   ├── STREAMLIT_DEPLOYMENT.md     # Streamlit Cloud deployment
+│   ├── DEPLOYMENT_GUIDE.md         # All deployment options
+│   └── TROUBLESHOOTING.md          # Problem solving
 ├── .gitignore                      # Git ignore rules
 └── .streamlit/
-    ├── config.toml                 # Streamlit configuration
-    └── secrets.toml                # Passwords (NOT in Git)
+   ├── config.toml                 # Streamlit configuration
+   └── secrets.toml                # Passwords (NOT in Git)
 ```
 
 ## Security �️
