@@ -320,18 +320,62 @@ def create_excel_download(df, metadata=None, quality_issues=None):
             meta_df = pd.DataFrame(list(metadata.items()), columns=['Property', 'Value'])
             meta_df.to_excel(writer, index=False, sheet_name='Metadata')
         
-        # Data quality sheet
+        # Data quality summary sheet
         if quality_issues:
             quality_data = []
             if quality_issues.get('missing'):
                 for col, count in quality_issues['missing'].items():
-                    quality_data.append({'Issue Type': 'Missing Values', 'Column': col, 'Count': count})
+                    quality_data.append({
+                        'Issue Type': 'Missing Values', 
+                        'Column': col, 
+                        'Count': count,
+                        'Impact': '⚠️ High' if count > 100 else '⚠️ Medium' if count > 10 else '⚠️ Low'
+                    })
             if quality_issues.get('duplicates'):
-                quality_data.append({'Issue Type': 'Duplicate Rows', 'Column': 'All', 'Count': quality_issues['duplicates']})
+                quality_data.append({
+                    'Issue Type': 'Duplicate Rows', 
+                    'Column': 'All', 
+                    'Count': quality_issues['duplicates'],
+                    'Impact': '⚠️ High' if quality_issues['duplicates'] > 100 else '⚠️ Medium'
+                })
             
             if quality_data:
                 quality_df = pd.DataFrame(quality_data)
-                quality_df.to_excel(writer, index=False, sheet_name='Data Quality')
+                quality_df.to_excel(writer, index=False, sheet_name='Data Quality Summary')
+        
+        # Detailed missing values sheet with row locations
+        if quality_issues and quality_issues.get('missing_details'):
+            missing_details_data = []
+            for col, details in quality_issues['missing_details'].items():
+                # Convert row indices to Excel row numbers (add 2 for header)
+                excel_rows = [idx + 2 for idx in details['rows']]
+                rows_str = ", ".join(map(str, excel_rows[:50]))  # Show first 50
+                if len(excel_rows) > 50:
+                    rows_str += f"... and {len(excel_rows) - 50} more"
+                
+                missing_details_data.append({
+                    'Column Name': col,
+                    'Missing Count': details['count'],
+                    'Excel Row Numbers': rows_str,
+                    'Quick Fix': f"Filter: df[df['{col}'].notna()] OR Fill: df['{col}'].fillna('N/A')"
+                })
+            
+            if missing_details_data:
+                missing_df = pd.DataFrame(missing_details_data)
+                missing_df.to_excel(writer, index=False, sheet_name='Missing Values Detail')
+        
+        # Duplicate rows detail sheet
+        if quality_issues and quality_issues.get('duplicate_rows'):
+            excel_rows = [idx + 2 for idx in quality_issues['duplicate_rows']]
+            dup_data = [{
+                'Excel Row Number': row,
+                'Status': 'Duplicate',
+                'Action': 'Review and remove'
+            } for row in excel_rows[:100]]  # Limit to 100
+            
+            if dup_data:
+                dup_df = pd.DataFrame(dup_data)
+                dup_df.to_excel(writer, index=False, sheet_name='Duplicate Rows Detail')
     
     output.seek(0)
     return output
@@ -344,23 +388,37 @@ def _read_uploaded_file(name: str, file_bytes: bytes) -> pd.DataFrame:
     return pd.read_excel(io.BytesIO(file_bytes))
 
 def analyze_data_quality(df):
-    """Analyze data quality and return issues."""
+    """Analyze data quality and return issues with row locations."""
     issues = {
         'missing': {},
+        'missing_details': {},  # Store specific row numbers
         'duplicates': 0,
+        'duplicate_rows': [],
         'non_numeric_prices': 0,
         'date_issues': 0,
         'customer_inconsistencies': []
     }
     
-    # Check missing values
+    # Check missing values with row locations
     for col in df.columns:
-        missing_count = df[col].isna().sum()
+        missing_mask = df[col].isna()
+        missing_count = missing_mask.sum()
         if missing_count > 0:
             issues['missing'][col] = missing_count
+            # Store row indices (Excel row = index + 2 because of header)
+            missing_rows = df[missing_mask].index.tolist()
+            issues['missing_details'][col] = {
+                'count': missing_count,
+                'rows': missing_rows[:100],  # Limit to first 100 rows
+                'sample_preview': len(missing_rows) > 100
+            }
     
-    # Check duplicates
+    # Check duplicates with row locations
+    duplicate_mask = df.duplicated(keep=False)
     issues['duplicates'] = df.duplicated().sum()
+    if issues['duplicates'] > 0:
+        duplicate_indices = df[duplicate_mask].index.tolist()
+        issues['duplicate_rows'] = duplicate_indices[:100]  # Limit to first 100
     
     return issues
 
@@ -440,20 +498,53 @@ def main():
                 # Missing values
                 if quality_issues['missing']:
                     st.warning(f"⚠️ Missing values found in {len(quality_issues['missing'])} columns")
-                    for col, count in list(quality_issues['missing'].items())[:3]:
-                        st.markdown(f"- **{col}**: {count} missing")
-                    if len(quality_issues['missing']) > 3:
-                        st.markdown(f"... and {len(quality_issues['missing']) - 3} more")
+                    
+                    # Show top 5 columns with missing values
+                    sorted_missing = sorted(quality_issues['missing_details'].items(), 
+                                          key=lambda x: x[1]['count'], reverse=True)
+                    
+                    for col, details in sorted_missing[:5]:
+                        with st.expander(f"📊 {col}: {details['count']} missing", expanded=False):
+                            # Convert row indices to Excel row numbers (add 2 for header)
+                            excel_rows = [idx + 2 for idx in details['rows'][:20]]
+                            
+                            st.markdown(f"**Missing in Excel rows:**")
+                            # Display in groups of 10 for readability
+                            row_groups = [excel_rows[i:i+10] for i in range(0, len(excel_rows), 10)]
+                            for group in row_groups:
+                                st.code(", ".join(map(str, group)))
+                            
+                            if details['sample_preview']:
+                                st.info(f"📌 Showing first 20 of {details['count']} missing rows")
+                            
+                            # Quick fix suggestions
+                            st.markdown("**💡 Quick Fixes:**")
+                            st.markdown(f"- Filter: `df[df['{col}'].notna()]`")
+                            st.markdown(f"- Fill: `df['{col}'].fillna('N/A')`")
+                    
+                    if len(quality_issues['missing']) > 5:
+                        st.markdown(f"... and **{len(quality_issues['missing']) - 5} more columns** with issues")
                 else:
                     st.success("✅ No missing values")
                 
                 # Duplicates
                 if quality_issues['duplicates'] > 0:
-                    st.warning(f"⚠️ {quality_issues['duplicates']} duplicate rows found")
+                    with st.expander(f"⚠️ {quality_issues['duplicates']} duplicate rows found", expanded=False):
+                        excel_rows = [idx + 2 for idx in quality_issues['duplicate_rows'][:20]]
+                        st.markdown("**Duplicate rows (Excel row numbers):**")
+                        row_groups = [excel_rows[i:i+10] for i in range(0, len(excel_rows), 10)]
+                        for group in row_groups:
+                            st.code(", ".join(map(str, group)))
+                        
+                        if len(quality_issues['duplicate_rows']) > 20:
+                            st.info(f"📌 Showing first 20 of {quality_issues['duplicates']} duplicates")
+                        
+                        st.markdown("**💡 Quick Fix:**")
+                        st.code("df.drop_duplicates(inplace=True)")
                 else:
                     st.success("✅ No duplicate rows")
                 
-                st.info("💡 Quality report included in Excel download")
+                st.info("💡 Detailed quality report included in Excel download")
             
             # Column mapping section
             st.sidebar.markdown("---")
